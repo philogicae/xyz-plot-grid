@@ -1,6 +1,8 @@
 # xyz-plot-grid
 stable-diffusion-webui xyz-plot-grid
 
+Check issues. I might have found an issue, hitting save saves it twice. Check on a very low count and see if it duplicates any autosaves.
+
 For automatic1111 stable-diffusion-webui.
 
 Place xyz_grid.py in scripts folder along side other scripts.  
