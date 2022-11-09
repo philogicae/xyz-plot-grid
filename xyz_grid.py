@@ -189,7 +189,7 @@ def draw_xy_grid(p, xs, ys, zs, x_labels, y_labels, z_labels, cell, draw_legend,
     ver_texts = [[images.GridAnnotation(y)] for y in y_labels]
     hor_texts = [[images.GridAnnotation(x)] for x in x_labels]
     
-    layer_texts = [[images.GridAnnotation(z)] for z in z_labels] * len(y_labels) if len(y_labels) > 0 else [[images.GridAnnotation(z)] for z in z_labels]
+    layer_texts = [[images.GridAnnotation(z)] for z in z_labels] 
 
     blank_texts = [[images.GridAnnotation("")] for z in x_labels]
     # Temporary list of all the images that are generated to be populated into the grid.
@@ -246,6 +246,7 @@ def draw_xy_grid(p, xs, ys, zs, x_labels, y_labels, z_labels, cell, draw_legend,
         #grid = images.image_grid(image_cache, rows=len(ys))
         if draw_legend:
             grids[zz] = images.draw_grid_annotations(grids[zz], cell_size[0], cell_size[1], hor_texts, ver_texts)
+    cell_size = (cell_size[0], cell_size[1] * len(y_labels))
     grid = images.image_grid(grids, rows=len(zs))
     if draw_legend:
         grid = images.draw_grid_annotations(grid, cell_size[0], cell_size[1], blank_texts, layer_texts)
