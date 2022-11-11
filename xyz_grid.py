@@ -185,7 +185,7 @@ axis_options = [
 ]
 
 
-def draw_xy_grid(p, xs, ys, zs, x_labels, y_labels, z_labels, cell, draw_legend, include_lone_images):
+def draw_xyz_grid(p, xs, ys, zs, x_labels, y_labels, z_labels, cell, draw_legend, include_lone_images):
     ver_texts = [[images.GridAnnotation(y)] for y in y_labels]
     hor_texts = [[images.GridAnnotation(x)] for x in x_labels]
     
@@ -237,24 +237,24 @@ def draw_xy_grid(p, xs, ys, zs, x_labels, y_labels, z_labels, cell, draw_legend,
         return Processed()
 
     #TODO: customize grid, image_grid
-    #grid = [[] for i in range(len(zs))]
     grids = [[] for i in range(len(zs))]
     for zz in range(len(zs)):
         grids[zz] = images.image_grid(image_cache[zz], rows=len(ys))
-        #print("*************** GRID ***********\n", grid, "\n****************\n")
-        #grid[zz] = images.image_grid(image_cache[zz], rows=len(ys))
-        #grid = images.image_grid(image_cache, rows=len(ys))
         if draw_legend:
-            grids[zz] = images.draw_grid_annotations(grids[zz], cell_size[0], cell_size[1], hor_texts, ver_texts)
+            #grids[zz] = images.draw_grid_annotations(grids[zz], cell_size[0], cell_size[1], hor_texts, ver_texts, layer_texts[zz])
+            grids[zz] = draw_grid_annotations(grids[zz], cell_size[0], cell_size[1], hor_texts, ver_texts, layer_texts[zz])
     cell_size = (cell_size[0], cell_size[1] * len(y_labels))
+    for e in grids[::-1]:
+        processed_result.images.insert(1, e)
     grid = images.image_grid(grids, rows=len(zs))
-    if draw_legend:
-        grid = images.draw_grid_annotations(grid, cell_size[0], cell_size[1], blank_texts, layer_texts)
+    #Old way of drawing grid, now it's handled in draw_grid_ann...
+    #if draw_legend:
+        #grid = draw_grid_annotations(grid, cell_size[0], cell_size[1], blank_texts, layer_texts)
+        #grid = images.draw_grid_annotations(grid, cell_size[0], cell_size[1], blank_texts, layer_texts)
 
     processed_result.images[0] = grid
-    #processed_result.images[0] = [i for i in grid]
 
-    return processed_result
+    return (processed_result, len(grids) + 1)
 
 
 class SharedSettingsStackHelper(object):
@@ -411,12 +411,12 @@ class Script(scripts.Script):
             x_opt.apply(pc, x, xs)
             y_opt.apply(pc, y, ys)
             z_opt.apply(pc, z, zs)
-            #print(z_opt, z_opt.apply)
 
             return process_images(pc)
 
         with SharedSettingsStackHelper():
-            processed = draw_xy_grid(
+            #Extra return to catch other grids for saving
+            processed, grids_size = draw_xyz_grid(
                 p,
                 xs=xs,
                 ys=ys,
@@ -430,6 +430,95 @@ class Script(scripts.Script):
             )
 
         if opts.grid_save:
-            images.save_image(processed.images[0], p.outpath_grids, "xyz_grid", prompt=p.prompt, seed=processed.seed, grid=True, p=p)
+            for _img_num in range(grids_size):
+                images.save_image(processed.images[_img_num], p.outpath_grids, "xyz_grid", prompt=p.prompt, seed=processed.seed, grid=True, p=p)
 
         return processed
+
+def draw_grid_annotations(im, width, height, hor_texts, ver_texts, z_text=[]):
+    def wrap(drawing, text, font, line_length):
+        lines = ['']
+        for word in text.split():
+            line = f'{lines[-1]} {word}'.strip()
+            if drawing.textlength(line, font=font) <= line_length:
+                lines[-1] = line
+            else:
+                lines.append(word)
+        return lines
+
+    def draw_texts(drawing, draw_x, draw_y, lines):
+        for i, line in enumerate(lines):
+            drawing.multiline_text((draw_x, draw_y + line.size[1] / 2), line.text, font=fnt, fill=color_active if line.is_active else color_inactive, anchor="mm", align="center")
+
+            if not line.is_active:
+                drawing.line((draw_x - line.size[0] // 2, draw_y + line.size[1] // 2, draw_x + line.size[0] // 2, draw_y + line.size[1] // 2), fill=color_inactive, width=4)
+
+            draw_y += line.size[1] + line_spacing
+
+    fontsize = (width + height) // 25
+    line_spacing = fontsize // 2
+
+    try:
+        fnt = images.ImageFont.truetype(opts.font or images.Roboto, fontsize)
+    except Exception:
+        fnt = images.ImageFont.truetype(images.Roboto, fontsize)
+
+    color_active = (0, 0, 0)
+    color_inactive = (153, 153, 153)
+
+    pad_left = 0 if sum([sum([len(line.text) for line in lines]) for lines in ver_texts]) == 0 else width * 3 // 4
+
+    cols = im.width // width
+    rows = im.height // height
+
+    assert cols == len(hor_texts), f'bad number of horizontal texts: {len(hor_texts)}; must be {cols}'
+    assert rows == len(ver_texts), f'bad number of vertical texts: {len(ver_texts)}; must be {rows}'
+
+    calc_img = Image.new("RGB", (1, 1), "white")
+    calc_d = images.ImageDraw.Draw(calc_img)
+
+    for texts, allowed_width in zip(hor_texts + ver_texts, [width] * len(hor_texts) + [pad_left] * len(ver_texts)):
+        items = [] + texts
+        texts.clear()
+
+        for line in items:
+            wrapped = wrap(calc_d, line.text, fnt, allowed_width)
+            texts += [images.GridAnnotation(x, line.is_active) for x in wrapped]
+
+        for line in texts:
+            bbox = calc_d.multiline_textbbox((0, 0), line.text, font=fnt)
+            line.size = (bbox[2] - bbox[0], bbox[3] - bbox[1])
+
+    hor_text_heights = [sum([line.size[1] + line_spacing for line in lines]) - line_spacing for lines in hor_texts]
+    ver_text_heights = [sum([line.size[1] + line_spacing for line in lines]) - line_spacing * len(lines) for lines in
+                        ver_texts]
+
+    pad_top = max(hor_text_heights) + line_spacing * 2
+
+    result = Image.new("RGB", (im.width + pad_left, im.height + pad_top), "white")
+    result.paste(im, (pad_left, pad_top))
+
+    d = images.ImageDraw.Draw(result)
+
+    for col in range(cols):
+        x = pad_left + width * col + width / 2
+        y = pad_top / 2 - hor_text_heights[col] / 2
+
+        draw_texts(d, x, y, hor_texts[col])
+
+    for row in range(rows):
+        x = pad_left / 2
+        y = pad_top + height * row + height / 2 - ver_text_heights[row] / 2 
+
+        draw_texts(d, x, y, ver_texts[row])
+
+    if len(z_text) == 1:
+        zwrap = wrap(calc_d, z_text[0].text, fnt, width)
+        ztxts = []
+        ztxts += [images.GridAnnotation(x, z_text[0].is_active) for x in zwrap]
+        zbbox = calc_d.multiline_textbbox((0,0), z_text[0].text, font=fnt)
+        z_text[0].size = (bbox[2] - bbox[0], bbox[3] - bbox[1])
+        draw_texts(d, pad_left / 2, pad_top / 2, z_text)
+
+    return result
+
