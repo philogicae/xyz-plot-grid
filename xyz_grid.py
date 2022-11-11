@@ -204,8 +204,8 @@ def draw_xyz_grid(p, xs, ys, zs, x_labels, y_labels, z_labels, cell, draw_legend
     for iz, z in enumerate(zs):
         for iy, y in enumerate(ys):
             for ix, x in enumerate(xs):
-                if state.interrupted:
-                    return None
+                #if state.interrupted:
+                #    return None
                 state.job = f"{ix + iy + iz * len(xs) * len(ys) + 1} out of {len(xs) * len(ys) * len(zs)}"
 
                 processed:Processed = cell(x, y, z)
@@ -233,8 +233,8 @@ def draw_xyz_grid(p, xs, ys, zs, x_labels, y_labels, z_labels, cell, draw_legend
                     image_cache[iz].append(Image.new(cell_mode, cell_size))
 
     if not processed_result:
-        print("Unexpected error: draw_xy_grid failed to return even a single processed image")
-        return Processed()
+        print("Unexpected error: draw_xyz_grid failed to return even a single processed image")
+        return (Processed(), 0)
 
     #TODO: customize grid, image_grid
     grids = [[] for i in range(len(zs))]
