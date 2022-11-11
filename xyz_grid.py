@@ -241,21 +241,20 @@ def draw_xyz_grid(p, xs, ys, zs, x_labels, y_labels, z_labels, cell, draw_legend
     for zz in range(len(zs)):
         grids[zz] = images.image_grid(image_cache[zz], rows=len(ys))
         if draw_legend:
-            print(layer_texts)
-            print(layer_texts[zz])
             #grids[zz] = images.draw_grid_annotations(grids[zz], cell_size[0], cell_size[1], hor_texts, ver_texts, layer_texts[zz])
             grids[zz] = draw_grid_annotations(grids[zz], cell_size[0], cell_size[1], hor_texts, ver_texts, layer_texts[zz])
     cell_size = (cell_size[0], cell_size[1] * len(y_labels))
     for e in grids[::-1]:
         processed_result.images.insert(1, e)
     grid = images.image_grid(grids, rows=len(zs))
-    if draw_legend:
-        grid = draw_grid_annotations(grid, cell_size[0], cell_size[1], blank_texts, layer_texts)
+    #Old way of drawing grid, now it's handled in draw_grid_ann...
+    #if draw_legend:
+        #grid = draw_grid_annotations(grid, cell_size[0], cell_size[1], blank_texts, layer_texts)
         #grid = images.draw_grid_annotations(grid, cell_size[0], cell_size[1], blank_texts, layer_texts)
 
     processed_result.images[0] = grid
 
-    return processed_result
+    return (processed_result, len(grids) + 1)
 
 
 class SharedSettingsStackHelper(object):
@@ -416,7 +415,8 @@ class Script(scripts.Script):
             return process_images(pc)
 
         with SharedSettingsStackHelper():
-            processed = draw_xyz_grid(
+            #Extra return to catch other grids for saving
+            processed, grids_size = draw_xyz_grid(
                 p,
                 xs=xs,
                 ys=ys,
@@ -430,7 +430,8 @@ class Script(scripts.Script):
             )
 
         if opts.grid_save:
-            images.save_image(processed.images[0], p.outpath_grids, "xyz_grid", prompt=p.prompt, seed=processed.seed, grid=True, p=p)
+            for _img_num in range(grids_size):
+                images.save_image(processed.images[_img_num], p.outpath_grids, "xyz_grid", prompt=p.prompt, seed=processed.seed, grid=True, p=p)
 
         return processed
 
@@ -507,25 +508,17 @@ def draw_grid_annotations(im, width, height, hor_texts, ver_texts, z_text=[]):
 
     for row in range(rows):
         x = pad_left / 2
-        y = pad_top + height * row + height / 2 - ver_text_heights[row] / 2
+        y = pad_top + height * row + height / 2 - ver_text_heights[row] / 2 
 
         draw_texts(d, x, y, ver_texts[row])
 
     if len(z_text) == 1:
-        print("******")
-        print(z_text)
-        print(type(z_text))
-        print(dir(z_text))
-        print()
-        print(hor_texts)
-        print(type(hor_texts))
-        print(dir(hor_texts))
-        print()
-        print(hor_texts[0])
-        print(type(hor_texts[0]))
-        print(dir(hor_texts[0]))
-        print("******")
-        draw_texts(d, 0, 0, [z_text])
+        zwrap = wrap(calc_d, z_text[0].text, fnt, width)
+        ztxts = []
+        ztxts += [images.GridAnnotation(x, z_text[0].is_active) for x in zwrap]
+        zbbox = calc_d.multiline_textbbox((0,0), z_text[0].text, font=fnt)
+        z_text[0].size = (bbox[2] - bbox[0], bbox[3] - bbox[1])
+        draw_texts(d, pad_left / 2, pad_top / 2, z_text)
 
     return result
 
