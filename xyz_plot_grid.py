@@ -413,7 +413,7 @@ class Script(scripts.Script):
 
         if opts.grid_save:
             for _img_num in range(grids_size):
-                images.save_image(processed.images[_img_num], p.outpath_grids, "xyz_grid", prompt=p.prompt, seed=processed.seed, grid=True, p=p)
+                images.save_image(processed.images[_img_num], p.outpath_grids, "xyz_grid", extension=opts.grid_format, prompt=p.prompt, seed=processed.seed, grid=True, p=p)
 
         return processed
 
