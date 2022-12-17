@@ -18,6 +18,7 @@ import modules.shared as shared
 import modules.sd_samplers
 import modules.sd_models
 import re
+import os
 
 
 def apply_field(field):
@@ -261,27 +262,53 @@ re_range_count = re.compile(r"\s*([+-]?\s*\d+)\s*-\s*([+-]?\s*\d+)(?:\s*\[(\d+)\
 re_range_count_float = re.compile(r"\s*([+-]?\s*\d+(?:.\d*)?)\s*-\s*([+-]?\s*\d+(?:.\d*)?)(?:\s*\[(\d+(?:.\d*)?)\s*\])?\s*")
 
 class Script(scripts.Script):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.basedir = scripts.basedir()
+        self.usercss = os.path.join(self.basedir, "user.css")
+        self.updated = False
+        if os.path.exists(self.usercss):
+            with open(self.usercss, 'r+') as f:
+                lines = f.readlines()
+                for e in lines:
+                    if "#xyz_x_type" in e:
+                        self.updated = True
+                if not self.updated:
+                    print("xyz_plot_grid updating: adding element id to user.css")
+                    f.seek(0, 2)
+                    f.write("#xyz_x_type, #xyz_y_type, #xyz_z_type { max-width: 10em;}")
+                    print("xyz_plot_grid updated")
+        else:
+            with open(self.usercss, "w") as f:
+                print("xyz_plot_grid updating: creating user.css and adding element id to user.css")
+                f.write("#xyz_x_type, #xyz_y_type, #xyz_z_type { max-width: 10em;}")
+                print("xyz_plot_grid updated")
+
+
+                
+
     def title(self):
         return "X/Y/Z plot"
 
     def ui(self, is_img2img):
         current_axis_options = [x for x in axis_options if type(x) == AxisOption or type(x) == AxisOptionImg2Img and is_img2img]
 
-        with gr.Row():
-            x_type = gr.Dropdown(label="X type", choices=[x.label for x in current_axis_options], value=current_axis_options[4].label, type="index", elem_id="x_type")
-            x_values = gr.Textbox(label="X values", lines=1)
+        with gr.Row() as r:
+                x_type = gr.Dropdown(label="X Type", choices=[x.label for x in current_axis_options], value=current_axis_options[4].label, type="index", elem_id="xyz_x_type")
+                x_values = gr.Textbox(label="X Values", lines=1, elem_id="xyz_x_values")
 
         with gr.Row():
-            y_type = gr.Dropdown(label="Y type", choices=[x.label for x in current_axis_options], value=current_axis_options[5].label, type="index", elem_id="y_type")
-            y_values = gr.Textbox(label="Y values", lines=1)
+                y_type = gr.Dropdown(label="Y Type", choices=[x.label for x in current_axis_options], value=current_axis_options[5].label, type="index", elem_id="xyz_y_type")
+                y_values = gr.Textbox(label="Y Values", lines=1, elem_id="xyz_y_values")
 
         with gr.Row():
-            z_type = gr.Dropdown(label="Z type", choices=[x.label for x in current_axis_options], value=current_axis_options[18].label, type="index", elem_id="z_type")
-            z_values = gr.Textbox(label="Z values", lines=1)
+                z_type = gr.Dropdown(label="Z Type", choices=[x.label for x in current_axis_options], value=current_axis_options[18].label, type="index", elem_id="xyz_z_type")
+                z_values = gr.Textbox(label="Z Values", lines=1, elem_id="xyz_z_values")
         
-        draw_legend = gr.Checkbox(label='Draw legend', value=True)
-        include_lone_images = gr.Checkbox(label='Include Separate Images', value=False)
-        no_fixed_seeds = gr.Checkbox(label='Keep -1 for seeds', value=False)
+        draw_legend = gr.Checkbox(label='Draw Legend', value=True, elem_id="xyz_legend_checkbox")
+        include_lone_images = gr.Checkbox(label='Include Individual Images', value=False, elem_id="xyz_lone_images_checkbox")
+        no_fixed_seeds = gr.Checkbox(label='Keep -1 for Seeds', value=False, elem_id="xyz_fix_seeds_checkbox")
 
         return [x_type, x_values, y_type, y_values, z_type, z_values, draw_legend, include_lone_images, no_fixed_seeds]
 
